@@ -1,3 +1,3 @@
-# tda
+# Topological data analysis for PET/MR
 
-TDA for PET/MR data
+Application of Mapper from Saggar et al. (2021) on the Monash rsPET-fMRI dataset.
