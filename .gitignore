@@ -38,6 +38,10 @@ Thumbs.db
 
 # Others #
 ######################
-*.ipynb
+# *.ipynb
 *.nii
 *.nii.gz
+*.csv
+*.gii
+*.gii.gz
+*.trk
