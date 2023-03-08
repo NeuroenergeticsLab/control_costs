@@ -1,3 +1,3 @@
-# Topological data analysis for PET/MR
+# Relating theoretical and biological energy: a study on control energy and its organizational principles
 
-Application of Mapper from Saggar et al. (2021) on the Monash rsPET-fMRI dataset.
+Project relating network control energy to biological PET energetic data.
