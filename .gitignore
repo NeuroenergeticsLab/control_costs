@@ -11,6 +11,7 @@
 ############
 # it's better to unpack these files and commit the raw source
 # git has its own built in compression methods
+*.gz
 *.7z
 *.dmg
 *.gz
@@ -40,8 +41,13 @@ Thumbs.db
 ######################
 # *.ipynb
 *.nii
+<<<<<<< HEAD
 *.nii.gz
 *.csv
 *.gii
 *.gii.gz
+=======
+*.csv
+*.gii
+>>>>>>> 14afe6b (reorganized repo structure and included preliminary publication files)
 *.trk
