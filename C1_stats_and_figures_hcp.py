@@ -79,7 +79,7 @@ mni = f'./data/MNI152_T1_{den}_brain.nii.gz'
 mask = NiftiLabelsMasker(atlas_vol).fit(mni)
 
 # CMRglc map
-tum_cmrglc = './data/avg_cmrglc_subjs-20_45min_mcf_fwhm-6_quant-cmrglc_acq-2242min_pvc-pveseg_mni-3mm.nii.gz'
+tum_cmrglc = './data/annotations/tum/cmrglc/MNI152/avg_cmrglc_subjs-20_45min_mcf_fwhm-6_quant-cmrglc_acq-2242min_pvc-pveseg_mni-3mm.nii.gz'
 roi_cmrglc = mask.fit_transform(tum_cmrglc)[0]
 
 # CMRO2 map
