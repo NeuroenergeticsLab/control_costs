@@ -1,6 +1,4 @@
-#####################################################################################################################################
-# %% Script to show statistics and plots using the Monash dataset
-#####################################################################################################################################
+# %% 
 import warnings
 warnings.filterwarnings("ignore")
 import glob
@@ -29,7 +27,6 @@ from src.cmaps import sequential_green, custom_coolwarm
 
 dataset = 'hcp'
 atlas = 'Schaefer400'
-atlas_short = atlas.replace('400','')
 root_dir = './data/'
 dataset_dir = root_dir + f'{dataset}/'
 output_dir = f'./results/{dataset}/'
@@ -81,7 +78,7 @@ surf_masker = Parcellater(atlas_fslr,'fslr')
 control_df = pd.read_csv(output_dir + f'average-control-energy_subject-level_{atlas}.csv')
 avg_ctrl = control_df.groupby('ROI').mean()['E_control'].values
 
-# %% 
+# %% Load modality-wise data
 mod_df = pd.read_csv(output_dir + f'average-control-energy_modality_subject-level_{atlas}.csv').drop('E_sub', axis=1)
 
 # rename transition names for readability
@@ -104,7 +101,10 @@ mod_df['hierarchy'] = mod_df['transition_type'].map(hierarchy_dict)
 
 x = mod_df[mod_df['hierarchy'] == 'Between']['value']
 y = mod_df[mod_df['hierarchy'] == 'Within']['value']
-p = pg.wilcoxon(x,y)['p-val'][0]
+results = pg.mwu(x,y)
+p_str = get_significance_string(results['p-val'][0], type='text').upper()
+print(f"U = {results['U-val'][0]}")
+print(f"P = {p_str}")
 
 # %%
 fig = plt.figure(figsize=(6, 5), dpi=200)
@@ -204,7 +204,8 @@ plt.tight_layout()
 # plt.savefig('./figs/Fig4_ntransitions_modalitites.pdf')
 
 # %%
-lm = sns.lmplot(data=mod_df, x='NTr', y='value', scatter_kws={'s':0}, line_kws={'color':'Grey','alpha':0.5})
+lm = sns.lmplot(data=mod_df, x='NTr', y='value', scatter_kws={'s':0}, line_kws={'color':'Grey','alpha':0.5},
+                ci=None)
 lm.fig.set_dpi(250)
 plt.rcParams.update({'font.size': 12})
 pal_list = np.array(sequential_green(return_palette=True))[[1,3,4,7]]
@@ -215,7 +216,7 @@ ax = sns.scatterplot(data=mod_df, x='NTr', y='value', hue='transition_type', hue
 plt.ylabel('Whole-brain TCE [a.u.]')
 plt.xlabel('No. of transitions [log$_{10}$]')
 r,dof,p,ci,power = pg.rm_corr(data=mod_df, y='NTr', x='value', subject='subject').values[0]
-p_str = get_significance_string(p, type='text')
+p_str = get_significance_string(p, type='text').upper()
 anchor = (1,0.3) if dataset == 'hcp' else (0.4,0.35)
 ax.legend(title='Transition type', bbox_to_anchor=anchor, frameon=False)
 plt.title(f"$r_{{rm}}$ = {r:.3f}\n{p_str}", loc='right', y=0.8)
