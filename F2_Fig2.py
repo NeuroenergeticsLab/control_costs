@@ -161,6 +161,7 @@ for i,avg_state in enumerate(avg_states):
 
 # %% Figure 2d
 control_df = pd.read_csv(output_dir + f'optimal-transition-energies_subject-level_{atlas}.csv')
+# Plot transitions between these networks
 initials = ['Limbic', 'SomMot', 'Vis', 'Vis', 'Default']
 goals = ['SomMot', 'Vis', 'Vis', 'Default', 'SalVentAttn']
 
@@ -168,12 +169,12 @@ colors = sequential_green(N=1000)
 max_all = 0
 
 for net1, net2 in zip(initials, goals):
-    avg_trans = trans_df[(trans_df['initial']==net1) & (trans_df['goal']==net2)]['E_control'].values
-    max_current = avg_trans.max()
+    avg_trans = control_df[(control_df['initial']==net1) & (control_df['goal']==net2)].groupby('ROI').mean()['E_control'].values
+    max_current = avg_trans.max() # check for maximum value for colorbar
     max_all = max_current if max_current >= max_all else max_all
 
 for net1, net2 in zip(initials, goals):
-    avg_trans = trans_df[(trans_df['initial']==net1) & (trans_df['goal']==net2)]['E_control'].values    
+    avg_trans = control_df[(control_df['initial']==net1) & (control_df['goal']==net2)].groupby('ROI').mean()['E_control'].values   
     avg_trans_surf = surf_masker.inverse_transform(avg_trans)
     l_trans, r_trans = avg_trans_surf[0].agg_data(), avg_trans_surf[1].agg_data()
     l_min, l_max = np.nanmin(l_trans), np.nanmax(l_trans)
