@@ -9,19 +9,11 @@ import pingouin as pg
 import scipy as sp
 import matplotlib.pyplot as plt
 from nilearn.input_data import NiftiLabelsMasker
-from nilearn.plotting import plot_surf
-from nctpy.utils import matrix_normalization
-from nctpy.metrics import ave_control
-from scipy.stats import pearsonr, ttest_rel, ttest_1samp
-from neuromaps.datasets import fetch_annotation, fetch_fslr
-from neuromaps.images import relabel_gifti, dlabel_to_gifti
-from neuromaps.stats import compare_images
+from neuromaps.images import dlabel_to_gifti
 from neuromaps.parcellate import Parcellater
-from neuromaps.transforms import fslr_to_fslr
-from neuromaps.nulls import burt2020
 from matplotlib.gridspec import GridSpec
-from src.utils import get_gordon_palette, get_significance_string
-from src.cmaps import sequential_green, custom_coolwarm
+from src.utils import get_significance_string
+from src.cmaps import sequential_green
 
 # %% General variables
 
@@ -78,7 +70,8 @@ surf_masker = Parcellater(atlas_fslr,'fslr')
 control_df = pd.read_csv(output_dir + f'average-control-energy_subject-level_{atlas}.csv')
 avg_ctrl = control_df.groupby('ROI').mean()['E_control'].values
 
-# %% Load modality-wise data
+# %% Figure 5b
+# Load modality-wise data
 mod_df = pd.read_csv(output_dir + f'average-control-energy_modality_subject-level_{atlas}.csv').drop('E_sub', axis=1)
 
 # rename transition names for readability
@@ -102,11 +95,12 @@ mod_df['hierarchy'] = mod_df['transition_type'].map(hierarchy_dict)
 x = mod_df[mod_df['hierarchy'] == 'Between']['value']
 y = mod_df[mod_df['hierarchy'] == 'Within']['value']
 results = pg.mwu(x,y)
-p_str = get_significance_string(results['p-val'][0], type='text').upper()
+p = results['p-val'][0]
+p_str = get_significance_string(p, type='text').upper()
 print(f"U = {results['U-val'][0]}")
-print(f"P = {p_str}")
+print(p_str)
 
-# %%
+# Boxplots 
 fig = plt.figure(figsize=(6, 5), dpi=200)
 gs = GridSpec(1, 2, width_ratios=[1.5, 1])
 
@@ -118,8 +112,6 @@ height_percentage = 0.85
 plt.rcParams.update({'font.size': 12})
 
 ax1 = plt.subplot(gs[0])
-# sns.barplot(data=mod_df, x='transition_type', y='value', width=0.5, ci='sd', 
-#             errwidth=bar_lwidth, order=order, palette=pal_list, ax=ax1)
 sns.stripplot(data=mod_df, x='transition_type', y='value', alpha=alpha, 
             linewidth=0.8, order=order, palette=pal_list, ax=ax1)
 
@@ -128,12 +120,8 @@ sns.boxplot(data=mod_df, x='transition_type', y='value', width=0.5,
             order=order, palette=pal_list, ax=ax1)
 
 ax2 = plt.subplot(gs[1])
-# sns.barplot(data=mod_df, x='hierarchy', y='value', width=0.8, ci='sd', 
-#             errwidth=bar_lwidth, palette='Greys', ax=ax2)
 sns.boxplot(data=mod_df, x='hierarchy', y='value', width=0.8, palette='Greys', ax=ax2,
                 linewidth=0, medianprops={"linewidth":lwidth}, whiskerprops={"linewidth":lwidth})
-# sns.stripplot(data=mod_df, x='hierarchy', y='value', alpha=alpha, 
-#                 linewidth=0.8, palette='Greys', ax=ax2)
 
 ax1.set(xlabel=None)
 ax1.set_ylabel('Whole-brain TCE [a.u.]')
@@ -162,9 +150,8 @@ ax1.set_ylim([lower_ylim, ax1.get_ylim()[1]])
 ax2.set_ylim([lower_ylim, ax2.get_ylim()[1]])
 sns.despine(ax=ax1, trim=True)
 plt.tight_layout()
-# plt.savefig('./figs/Fig4_ace_modalitites.pdf')
 
-#%% Number of transitions
+# %% Figure 5c
 ntransitions = np.empty((0))
 all_mtx = np.empty((2, 2, 0))
 
@@ -192,24 +179,22 @@ for subj_id in subjects:
     all_mtx = np.concatenate((all_mtx, mtx[:,:,None]), axis=-1)
 mod_df['NTr'] = np.log10(ntransitions)
 
-# %%
 ticks = ['Unimodal', 'Heteromodal']
 avg_transition = all_mtx.mean(axis=-1).astype(int)
 avg_transition = np.flip(avg_transition)
+avg_transition = avg_transition / avg_transition.sum()
 plt.figure(dpi=250)
 plt.rcParams.update({'font.size': 14})
-sns.heatmap(avg_transition, cmap=sequential_green(), 
-            xticklabels=ticks, yticklabels=ticks, cbar_kws={'label': 'No. of transitions'})
+sns.heatmap(avg_transition, cmap=sequential_green(), annot=True, fmt='.1%', annot_kws={'fontsize':14},
+            xticklabels=ticks, yticklabels=ticks, cbar_kws={'label': 'Transition frequency [%]'})
 plt.tight_layout()
-# plt.savefig('./figs/Fig4_ntransitions_modalitites.pdf')
 
-# %%
+# %% Figure 5d
 lm = sns.lmplot(data=mod_df, x='NTr', y='value', scatter_kws={'s':0}, line_kws={'color':'Grey','alpha':0.5},
                 ci=None)
 lm.fig.set_dpi(250)
 plt.rcParams.update({'font.size': 12})
-pal_list = np.array(sequential_green(return_palette=True))[[1,3,4,7]]
-# pal_list = sequential_green(return_palette=True)[1:3] + sequential_green(return_palette=True)[4,7]
+pal_list = np.array(sequential_green(return_palette=True))[[1, 3, 4, 7]]
 ax = sns.scatterplot(data=mod_df, x='NTr', y='value', hue='transition_type', hue_order=order,
                      palette=pal_list)
 
@@ -217,7 +202,7 @@ plt.ylabel('Whole-brain TCE [a.u.]')
 plt.xlabel('No. of transitions [log$_{10}$]')
 r,dof,p,ci,power = pg.rm_corr(data=mod_df, y='NTr', x='value', subject='subject').values[0]
 p_str = get_significance_string(p, type='text').upper()
-anchor = (1,0.3) if dataset == 'hcp' else (0.4,0.35)
+anchor = (1, 0.3) if dataset == 'hcp' else (0.4, 0.35)
 ax.legend(title='Transition type', bbox_to_anchor=anchor, frameon=False)
 plt.title(f"$r_{{rm}}$ = {r:.3f}\n{p_str}", loc='right', y=0.8)
 plt.tight_layout()
@@ -233,28 +218,3 @@ elif dataset == 'tum':
     ticks = np.log10(np.array([1, 10, 100]))
     labels = ['1', '10', '100']
     plt.xticks(ticks=ticks, labels=labels)
-
-
-# %% ######################################
-# plt.rcParams.update({'font.size': 12})
-# pal_list = sequential_green(return_palette=True)[0:2] + sequential_green(return_palette=True)[4:6]
-# lm = sns.jointplot(data=mod_df, x='NTr', y='value', hue='transition_type', hue_order=order, 
-#                    palette=pal_list)
-# lm.fig.set_dpi(250)
-# plt.ylabel('Whole-brain TCE [a.u.]')
-# plt.xlabel('Log$_{10}$(#Transitions)')
-# r,dof,p,ci,power = pg.rm_corr(data=mod_df, y='NTr', x='value', subject='subject').values[0]
-# p_str = get_significance_string(p, type='text')
-# sns.move_legend(lm.ax_joint, 'upper left', title='Transition type', bbox_to_anchor=(1.05,1), frameon=False)
-# plt.title(f"$r_{{rm}}$ = {r:.3f}\n{p_str}", loc='right', y=0.75)
-# plt.tight_layout()
-
-# lm.ax_joint.set_ylim([lower_ylim, lm.ax_joint.get_ylim()[1]])
-# lm.ax_marg_y.set_ylim([lower_ylim, lm.ax_joint.get_ylim()[1]])
-# lm.ax_marg_y.set_zorder(-1)
-# lm.ax_marg_y.tick_params(left=False)
-# lm.ax_marg_x.tick_params(bottom=False)
-# sns.despine(trim=True)
-# plt.tight_layout()
-
-# plt.savefig('./figs/Fig4_modTCE_vs_ntransitions.pdf')
