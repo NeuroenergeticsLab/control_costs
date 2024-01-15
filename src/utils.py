@@ -56,7 +56,7 @@ def tr_net_labels(df,nlabels,activity_thr):
         net_means.append(df[df['network_id']==i]['value'].mean())
     net_means = np.array(net_means)
     idx = np.argmax(net_means)
-    if net_means[idx]>=0.5:
+    if net_means[idx]>=activity_thr:
         return idx + 1
     else:
         return nlabels
@@ -624,45 +624,35 @@ def plot_network(A, coords, edge_scores, node_scores, edge_cmap="Greys",
     ax.axis('off')
     return fig, ax
 
-def plot_roi_surf(array, masker, cmap='inferno', figsize=(8, 4), dpi=200, plot_both=False, cbar_tick_format=None):
-
-    surfaces = fetch_fslr(density='32k')
-    lh, rh = surfaces['inflated']
-
-    avg_surf = masker.inverse_transform(array)
-    l, r = avg_surf[0].agg_data(), avg_surf[1].agg_data()
-    l_min, l_max = np.nanmin(l), np.nanmax(l)
-    l = np.nan_to_num(l, nan=l_min)
-
-    r_min, r_max = np.nanmin(r), np.nanmax(r)
-    r = np.nan_to_num(r, nan=r_min)
-
-    n_rows = 2 if plot_both else 1
-    cbar1 = False if plot_both else True
-    cbar_tick_format1 = None if plot_both else cbar_tick_format
-    fig, ax = plt.subplots(nrows=n_rows,ncols=2,subplot_kw={'projection': '3d'}, figsize=figsize, dpi=dpi)
+def partial_corr(X, Y, Z):
+    # check that X, Y, Z are all 2D arrays
+    if X.ndim == 1:
+        X = X[:, np.newaxis]
+    if Y.ndim == 1:
+        Y = Y[:, np.newaxis]
+    if Z.ndim == 1:
+        Z = Z[:, np.newaxis]
     
-    # Plot left
-    plot_surf(lh, l, threshold=-1e-14, cmap=cmap, alpha=1, view='medial',
-            colorbar=False, axes=ax.flat[0])
-    p1 = plot_surf(lh, l, threshold=-1e-14, cmap=cmap, alpha=1, view='lateral',
-                colorbar=cbar1, cbar_tick_format=cbar_tick_format1, axes=ax.flat[1])
-    if plot_both:
-         # Plot right
-        plot_surf(rh, r, threshold=-1e-14, cmap=cmap, alpha=1, view='medial',
-                colorbar=False, axes=ax.flat[2])
-        p2 = plot_surf(rh, r, threshold=-1e-14, cmap=cmap, alpha=1, view='lateral',
-                    colorbar=True, cbar_tick_format=cbar_tick_format, axes=ax.flat[3])
+    # stack variables into data array
+    data = np.hstack([X, Y, Z])
     
-    plt.subplots_adjust(wspace=-0.3)
-    p1.axes[-1].set_position(p.axes[-1].get_position().translated(0.08, 0))
-    if plot_both:
-        p2.axes[-1].set_position(p.axes[-1].get_position().translated(0.08, 0))
-    return fig
-# %%
-# from nctpy.plotting import reg_plot
-# fig, ax = plt.subplots(1,1)
-# reg_plot(roi_cmrglc, avg_ctrl, f'CMR$_{{glc}}$', 'ACE [a.u.]', regplot=False, ax=ax, add_spearman=True)
+    V = np.cov(data, rowvar=False)
+    Vi = np.linalg.pinv(V, hermitian=True)  # inverse covariance matrix
+    Vi_diag = Vi.diagonal()
+    D = np.diag(np.sqrt(1 / Vi_diag))
+    pcor = -1 * (D @ Vi @ D)  # partial correlation matrix
+    
+    return pcor[0,1]
 
-# fig, ax = plt.subplots(1,1)
-# reg_plot(roi_cmrox, avg_ctrl, f'CMR$_{{O2}}$', 'ACE [a.u.]', regplot=False, ax=ax, add_spearman=True)
+def pcorr_significance(src, trg, covariates, nulls):
+    r_true = partial_corr(src, trg, covariates)
+    n_perm = nulls.shape[-1]
+    permuted_results = []
+
+    for perm in range(n_perm):
+        src_perm = src[nulls[:, perm]]
+        permuted_results.append(partial_corr(src_perm, trg, covariates))
+
+    p = (1 + sum(np.abs(permuted_results) > np.abs(r_true))) / (1 + n_perm)
+    
+    return r_true, p
