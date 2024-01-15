@@ -47,5 +47,5 @@ Thumbs.db
 *.gii.gz
 *.trk
 old/
-data/hcp/
-data/tum/
+data/hcp/*.npy
+data/tum/*.npy
