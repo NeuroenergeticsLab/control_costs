@@ -31,14 +31,14 @@ elif dataset == 'hcp':
 if atlas == 'Gordon':
     den = '3mm'
     atlas_vol = root_dir + f'Gordon2016_space-MNI152_den-{den}.nii'
-    labels = ['AUD', 'CoP', 'CoPar' ,'DMN', 'DAN', 'FrP', 'None', 'RT', 'SAL','SMH','SMM','VAN','VIS','NOTA']
+    labels = ['AUD', 'CoP', 'CoPar', 'DMN', 'DAN', 'FrP', 'None', 'RT', 'SAL', 'SMH', 'SMM', 'VAN', 'VIS', 'NOTA']
     lab_short = labels
     atlas_order = pd.read_pickle(root_dir + 'Gordon2016_333_LUT.pkl')
     atlas_fslr = dlabel_to_gifti(root_dir + 'Gordon2016_333_space-fsLR_den-32k.dlabel.nii')
-    lab2mod={'AUD':'Unimodal','SMH':'Unimodal','SMM':'Unimodal','VIS':'Unimodal',
-             'CoP':'Heteromodal','CoPar':'Heteromodal','DMN':'Heteromodal','FrP':'Heteromodal',
-             'DAN':'Heteromodal','RT':'Heteromodal','SAL':'Heteromodal','VAN':'Heteromodal',
-             'None':'None','NOTA':'Subthreshold'}
+    lab2mod = {'AUD': 'Unimodal', 'SMH': 'Unimodal', 'SMM': 'Unimodal', 'VIS': 'Unimodal',
+               'CoP': 'Heteromodal', 'CoPar': 'Heteromodal', 'DMN': 'Heteromodal', 'FrP': 'Heteromodal',
+               'DAN': 'Heteromodal', 'RT': 'Heteromodal', 'SAL': 'Heteromodal', 'VAN': 'Heteromodal',
+               'None': 'None', 'NOTA': 'Subthreshold'}
 
 elif atlas == 'Schaefer400':
     den = '2mm'
@@ -47,9 +47,9 @@ elif atlas == 'Schaefer400':
     lab_short = ['VIS', 'SMN', 'DAN', 'SAL', 'LIM', 'FPN', 'DMN', 'NOTA']
     atlas_order = pd.read_pickle(root_dir + 'Schaefer2018_400_LUT.pkl')
     atlas_fslr = dlabel_to_gifti(root_dir + 'Schaefer2018_400_7N_space-fsLR_den-32k.dlabel.nii')
-    lab2mod = {'Vis':'Unimodal', 'SomMot':'Unimodal', 'DorsAttn':'Heteromodal', 'SalVentAttn':'Heteromodal', 
-               'Limbic':'Heteromodal', 'Cont':'Heteromodal', 'Default':'Heteromodal', 'NOTA':'Subthreshold'}
-    
+    lab2mod = {'Vis': 'Unimodal', 'SomMot': 'Unimodal', 'DorsAttn': 'Heteromodal', 'SalVentAttn': 'Heteromodal',
+               'Limbic': 'Heteromodal', 'Cont': 'Heteromodal', 'Default': 'Heteromodal', 'NOTA': 'Subthreshold'}
+
 elif atlas == 'Schaefer200':
     den = '2mm'
     atlas_vol = root_dir + f'Schaefer2018_200_7N_space-MNI152_den-{den}.nii.gz'
@@ -57,8 +57,8 @@ elif atlas == 'Schaefer200':
     lab_short = ['VIS', 'SMN', 'DAN', 'SAL', 'LIM', 'FPN', 'DMN', 'NOTA']
     atlas_order = pd.read_pickle(root_dir + 'Schaefer2018_200_LUT.pkl')
     atlas_fslr = dlabel_to_gifti(root_dir + 'Schaefer2018_200_7N_space-fsLR_den-32k.dlabel.nii')
-    lab2mod = {'Vis':'Unimodal', 'SomMot':'Unimodal', 'DorsAttn':'Heteromodal', 'SalVentAttn':'Heteromodal', 
-               'Limbic':'Heteromodal', 'Cont':'Heteromodal', 'Default':'Heteromodal', 'NOTA':'Subthreshold'}
+    lab2mod = {'Vis': 'Unimodal', 'SomMot': 'Unimodal', 'DorsAttn': 'Heteromodal', 'SalVentAttn': 'Heteromodal',
+               'Limbic': 'Heteromodal', 'Cont': 'Heteromodal', 'Default': 'Heteromodal', 'NOTA': 'Subthreshold'}
 
 nrois = len(atlas_order)
 nlabels = len(labels)
@@ -193,7 +193,7 @@ if levene['equal_var'][0]:
     results = pg.anova(data=plot_df, dv='E_control', between='age')
 else:
     results = pg.welch_anova(data=plot_df, dv='E_control', between='age')
-    
+
 p_str = get_significance_string(results['p-unc'][0], type='asterisk')
 ax2.annotate(p_str, xycoords='data', ha='center', 
                 xy=((middle_x1 + middle_x2)/2, ax2.get_ylim()[1]*(height_percentage)),
