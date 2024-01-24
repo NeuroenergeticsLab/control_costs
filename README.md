@@ -1,4 +1,4 @@
-# The control costs of human brain dymanics
+# The control costs of human brain dynamics
 
 This is the code for the above publication. It is recommended to clone this repository in case you intend to reproduce the results from the paper. To do so, type in the terminal the following command:
 
