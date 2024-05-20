@@ -70,7 +70,7 @@ surf_masker = Parcellater(atlas_fslr,'fslr')
 control_df = pd.read_csv(output_dir + f'average-control-energy_subject-level_{atlas}.csv')
 avg_ctrl = control_df.groupby('ROI').mean()['E_control'].values
 
-# %% Figure 5b
+# %% Prepare figure dataframe
 # Load modality-wise data
 mod_df = pd.read_csv(output_dir + f'average-control-energy_modality_subject-level_{atlas}.csv').drop('E_sub', axis=1)
 
@@ -92,66 +92,7 @@ mod_df = mod_df.sort_values(['subject','transition_type'],ignore_index=True)
 hierarchy_dict = {'H→H':'Within', 'U→U':'Within', 'H→U':'Between', 'U→H':'Between'}
 mod_df['hierarchy'] = mod_df['transition_type'].map(hierarchy_dict)
 
-x = mod_df[mod_df['hierarchy'] == 'Between']['value']
-y = mod_df[mod_df['hierarchy'] == 'Within']['value']
-results = pg.mwu(x,y)
-p = results['p-val'][0]
-p_str = get_significance_string(p, type='text').upper()
-print(f"U = {results['U-val'][0]}")
-print(p_str)
-
-# Boxplots 
-fig = plt.figure(figsize=(6, 5), dpi=200)
-gs = GridSpec(1, 2, width_ratios=[1.5, 1])
-
-pal_list = pal_list = sequential_green(return_palette=True)[0:2] + sequential_green(return_palette=True)[3:5]
-lower_ylim = 0
-alpha = 0.1
-lwidth = 1
-height_percentage = 0.85
-plt.rcParams.update({'font.size': 12})
-
-ax1 = plt.subplot(gs[0])
-sns.stripplot(data=mod_df, x='transition_type', y='value', alpha=alpha, 
-            linewidth=0.8, order=order, palette=pal_list, ax=ax1)
-
-sns.boxplot(data=mod_df, x='transition_type', y='value', width=0.5, 
-            linewidth=0, medianprops={"linewidth":lwidth}, whiskerprops={"linewidth":lwidth},
-            order=order, palette=pal_list, ax=ax1)
-
-ax2 = plt.subplot(gs[1])
-sns.boxplot(data=mod_df, x='hierarchy', y='value', width=0.8, palette='Greys', ax=ax2,
-                linewidth=0, medianprops={"linewidth":lwidth}, whiskerprops={"linewidth":lwidth})
-
-ax1.set(xlabel=None)
-ax1.set_ylabel('Whole-brain TCE [a.u.]')
-ax2.spines['left'].set_visible(False)
-ax2.tick_params(left=False)
-ax2.set(yticklabels=[], xlabel=None, ylabel=None)
-sns.despine(ax=ax2, left=True)
-fig.supxlabel('Transition type', y=0.05)
-plt.subplots_adjust(wspace=0.1)
-
-# Calculate the middle of the two barplots in ax2
-middle_x1 = ax2.get_xlim()[0] + (ax2.get_xlim()[1] - ax2.get_xlim()[0]) / 4
-middle_x2 = ax2.get_xlim()[0] + 3 * (ax2.get_xlim()[1] - ax2.get_xlim()[0]) / 4
-
-# Draw a horizontal line from the middle of the first bar to the middle of the second bar
-ax2.plot([middle_x1, middle_x2], 
-            [ax2.get_ylim()[1]*height_percentage, ax2.get_ylim()[1]*height_percentage], 
-            color='black', linewidth=1.5)
-
-# Add a star above the line
-ax2.annotate(get_significance_string(p), xycoords='data', ha='center', 
-                xy=((middle_x1 + middle_x2)/2, ax2.get_ylim()[1]*height_percentage),
-                xytext=((middle_x1 + middle_x2)/2, ax2.get_ylim()[1]*height_percentage))
-
-ax1.set_ylim([lower_ylim, ax1.get_ylim()[1]])
-ax2.set_ylim([lower_ylim, ax2.get_ylim()[1]])
-sns.despine(ax=ax1, trim=True)
-plt.tight_layout()
-
-# %% Figure 5c
+# Transitions
 ntransitions = np.empty((0))
 all_mtx = np.empty((2, 2, 0))
 
@@ -177,8 +118,9 @@ for subj_id in subjects:
             continue
     ntransitions = np.append(ntransitions,mtx.flatten())
     all_mtx = np.concatenate((all_mtx, mtx[:,:,None]), axis=-1)
-mod_df['NTr'] = np.log10(ntransitions)
+mod_df['NTr'] = np.log10(ntransitions) 
 
+# %% Figure 5b
 ticks = ['Unimodal', 'Heteromodal']
 avg_transition = all_mtx.mean(axis=-1).astype(int)
 avg_transition = np.flip(avg_transition)
@@ -189,10 +131,71 @@ sns.heatmap(avg_transition, cmap=sequential_green(), annot=True, fmt='.1%', anno
             xticklabels=ticks, yticklabels=ticks, cbar_kws={'label': 'Transition frequency [%]'})
 plt.tight_layout()
 
+# %% Figure 5c
+fig = plt.figure(figsize=(6, 5), dpi=200)
+gs = GridSpec(1, 2, width_ratios=[1.5, 0.6])
+
+pal_list = pal_list = sequential_green(return_palette=True)[0:2] + sequential_green(return_palette=True)[3:5]
+lower_ylim = 0
+alpha = 0.1
+lwidth = 1
+height_percentage = 0.85
+plt.rcParams.update({'font.size': 12})
+
+ax1 = plt.subplot(gs[0])
+sns.stripplot(data=mod_df, x='transition_type', y='value', alpha=alpha, 
+            linewidth=0.8, order=order, palette=pal_list, ax=ax1)
+
+sns.boxplot(data=mod_df, x='transition_type', y='value', width=0.5, 
+            linewidth=0, medianprops={"linewidth":lwidth}, whiskerprops={"linewidth":lwidth},
+            order=order, palette=pal_list, ax=ax1)
+
+ax2 = plt.subplot(gs[1])
+sns.boxplot(data=mod_df, x='hierarchy', y='value', width=0.8, palette='Greys', ax=ax2,
+                linewidth=0, medianprops={"linewidth":lwidth}, whiskerprops={"linewidth":lwidth})
+
+ax1.set(xlabel=None)
+ax1.set_ylabel('Whole-brain TCE [a.u.]')
+ax2.spines['left'].set_visible(False)
+ax2.tick_params(left=False)
+ax2.set(yticklabels=[], xlabel=None, ylabel=None)
+
+sns.despine(ax=ax2, left=True)
+fig.supxlabel('Transition type', y=0.05)
+plt.subplots_adjust(wspace=0.1)
+
+# Calculate the middle of the two barplots in ax2
+middle_x1 = ax2.get_xlim()[0] + (ax2.get_xlim()[1] - ax2.get_xlim()[0]) / 4
+middle_x2 = ax2.get_xlim()[0] + 3 * (ax2.get_xlim()[1] - ax2.get_xlim()[0]) / 4
+
+# Draw a horizontal line from the middle of the first bar to the middle of the second bar
+ax2.plot([middle_x1, middle_x2], 
+            [ax2.get_ylim()[1]*height_percentage, ax2.get_ylim()[1]*height_percentage], 
+            color='black', linewidth=1.5)
+
+# Add a star above the line
+ax2.annotate(get_significance_string(p), xycoords='data', ha='center', 
+                xy=((middle_x1 + middle_x2)/2, ax2.get_ylim()[1]*height_percentage),
+                xytext=((middle_x1 + middle_x2)/2, ax2.get_ylim()[1]*height_percentage))
+
+ax1.set_ylim([lower_ylim, ax1.get_ylim()[1]])
+ax2.set_ylim([lower_ylim, ax2.get_ylim()[1]])
+sns.despine(ax=ax1, trim=True)
+plt.tight_layout()
+
+x = mod_df[mod_df['hierarchy'] == 'Between']['value']
+y = mod_df[mod_df['hierarchy'] == 'Within']['value']
+results = pg.mwu(x,y)
+p = results['p-val'][0]
+p_str = get_significance_string(p, type='text').upper()
+print(f"U = {results['U-val'][0]}")
+print(p_str)
+
 # %% Figure 5d
-lm = sns.lmplot(data=mod_df, x='NTr', y='value', scatter_kws={'s':0}, line_kws={'color':'Grey','alpha':0.5},
+lm = sns.lmplot(data=mod_df, x='NTr', y='value', scatter_kws={'s':0}, line_kws={'color':'Grey','alpha':0},
                 ci=None)
 lm.fig.set_dpi(250)
+lm.fig.set_figwidth(5)
 plt.rcParams.update({'font.size': 12})
 pal_list = np.array(sequential_green(return_palette=True))[[1, 3, 4, 7]]
 ax = sns.scatterplot(data=mod_df, x='NTr', y='value', hue='transition_type', hue_order=order,
@@ -202,10 +205,9 @@ plt.ylabel('Whole-brain TCE [a.u.]')
 plt.xlabel('No. of transitions [log$_{10}$]')
 r,dof,p,ci,power = pg.rm_corr(data=mod_df, y='NTr', x='value', subject='subject').values[0]
 p_str = get_significance_string(p, type='text').upper()
-anchor = (1, 0.3) if dataset == 'hcp' else (0.4, 0.35)
+anchor = (1, 0.5) if dataset == 'hcp' else (0.4, 0.35)
 ax.legend(title='Transition type', bbox_to_anchor=anchor, frameon=False)
 plt.title(f"$r_{{rm}}$ = {r:.3f}\n{p_str}", loc='right', y=0.8)
-plt.tight_layout()
 
 ax.set_ylim([lower_ylim, ax.get_ylim()[1]])
 sns.despine()
@@ -218,3 +220,4 @@ elif dataset == 'tum':
     ticks = np.log10(np.array([1, 10, 100]))
     labels = ['1', '10', '100']
     plt.xticks(ticks=ticks, labels=labels)
+plt.tight_layout()
