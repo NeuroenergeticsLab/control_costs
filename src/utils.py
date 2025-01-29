@@ -70,8 +70,8 @@ def compute_optimal_energy_roiwise(df,state1,state2,A_norm,T,B,rho,S):
     from network_control.energies import integrate_u
     from scipy import integrate
     nrois = len(A_norm)
-    initial = df[df['state'] == state1]['beta'].values[:,None]
-    goal = df[df['state'] == state2]['beta'].values[:,None]
+    initial = df[df['state'] == state1]['value'].values[:,None]
+    goal = df[df['state'] == state2]['value'].values[:,None]
     if np.array_equal(initial,np.empty([0,1])) or np.array_equal(goal,np.empty([0,1])):
         energy, n_err = np.repeat(np.nan,nrois),np.repeat(np.nan,nrois)
     else:
@@ -104,8 +104,8 @@ def compute_optimal_energy_roiwise_null(df,state1,state2,A_norm,T,B,rho,S):
     from network_control.energies import integrate_u
     from scipy import integrate
     nrois = len(A_norm)
-    initial = df[df['state'] == state1]['beta'].values[:,None]
-    goal = df[df['state'] == state2]['beta'].values[:,None]
+    initial = df[df['state'] == state1]['values'].values[:,None]
+    goal = df[df['state'] == state2]['values'].values[:,None]
     if np.array_equal(initial,np.empty([0,1])) or np.array_equal(goal,np.empty([0,1])):
         print(f"Subject has no {state1} to {state2} transition")
         energy = np.repeat(np.nan,nrois)
@@ -114,7 +114,7 @@ def compute_optimal_energy_roiwise_null(df,state1,state2,A_norm,T,B,rho,S):
         energy = integrate_u(u)
     return energy.astype(int)
 
-def compute_optimal_energy_roiwise_slurm(betas, state1, state2, A_norm, T, B, rho, S):
+def compute_optimal_energy_roiwise_slurm(values, state1, state2, A_norm, T, B, rho, S):
     """
     Revised version of 'compute_optimal_energy_roiwise' to run more efficiently in SLURM. 
     Computes optimal control energy to transition from state1 to state2.
@@ -125,8 +125,8 @@ def compute_optimal_energy_roiwise_slurm(betas, state1, state2, A_norm, T, B, rh
     from network_control.energies import integrate_u
     from scipy import integrate
     nrois = len(A_norm)
-    initial = betas[state1]
-    goal = betas[state2]
+    initial = values[state1]
+    goal = values[state2]
     if np.array_equal(initial, np.zeros(nrois)) or np.array_equal(goal, np.zeros(nrois)):
         print(f"Subject has no {state1} to {state2} transition")
         energy = np.repeat(np.nan, nrois)
