@@ -66,8 +66,8 @@ def compute_optimal_energy_roiwise(df,state1,state2,A_norm,T,B,rho,S):
     Computes optimal control energy to transition from state1 to state2.
     """
     import numpy as np
-    from network_control.energies import optimal_input
-    from network_control.energies import integrate_u
+    from nctpy.energies import get_control_inputs
+    from nctpy.energies import integrate_u
     from scipy import integrate
     nrois = len(A_norm)
     initial = df[df['state'] == state1]['value'].values[:,None]
@@ -75,7 +75,8 @@ def compute_optimal_energy_roiwise(df,state1,state2,A_norm,T,B,rho,S):
     if np.array_equal(initial,np.empty([0,1])) or np.array_equal(goal,np.empty([0,1])):
         energy, n_err = np.repeat(np.nan,nrois),np.repeat(np.nan,nrois)
     else:
-        x, u, n_err = optimal_input(A_norm, T, B, initial, goal, rho, S)
+        x, u, n_err = get_control_inputs(A_norm, T, B, initial, goal, rho=rho, S=S,
+                                         system='continuous')
         energy = integrate_u(u)
         n_err = np.repeat(n_err,nrois)
     return energy, n_err
@@ -86,11 +87,12 @@ def compute_optimal_energy_roiwise_array(state1,state2,A_norm,T,B,rho,S):
     States are passed as numpy arrays.
     """
     import numpy as np
-    from network_control.energies import optimal_input
-    from network_control.energies import integrate_u
+    from nctpy.energies import get_control_inputs
+    from nctpy.energies import integrate_u
     from scipy import integrate
     nrois = len(A_norm)
-    x, u, n_err = optimal_input(A_norm, T, B, state1, state2, rho, S)
+    x, u, n_err = get_control_inputs(A_norm, T, B, state1, state2, rho=rho, S=S,
+                                     system='continuous')
     energy = integrate_u(u)
     n_err = np.repeat(n_err,nrois)
     return energy, n_err
@@ -100,8 +102,8 @@ def compute_optimal_energy_roiwise_null(df,state1,state2,A_norm,T,B,rho,S):
     Computes optimal control energy to transition from state1 to state2.
     """
     import numpy as np
-    from network_control.energies import optimal_input
-    from network_control.energies import integrate_u
+    from nctpy.energies import get_control_inputs
+    from nctpy.energies import integrate_u
     from scipy import integrate
     nrois = len(A_norm)
     initial = df[df['state'] == state1]['values'].values[:,None]
@@ -110,7 +112,8 @@ def compute_optimal_energy_roiwise_null(df,state1,state2,A_norm,T,B,rho,S):
         print(f"Subject has no {state1} to {state2} transition")
         energy = np.repeat(np.nan,nrois)
     else:
-        x, u, n_err = optimal_input(A_norm, T, B, initial, goal, rho, S)
+        x, u, n_err = get_control_inputs(A_norm, T, B, initial, goal, rho=rho, S=S,
+                                         system='continuous')
         energy = integrate_u(u)
     return energy.astype(int)
 
@@ -121,8 +124,8 @@ def compute_optimal_energy_roiwise_slurm(values, state1, state2, A_norm, T, B, r
     """
 
     import numpy as np
-    from network_control.energies import optimal_input
-    from network_control.energies import integrate_u
+    from nctpy.energies import get_control_inputs
+    from nctpy.energies import integrate_u
     from scipy import integrate
     nrois = len(A_norm)
     initial = values[state1]
@@ -132,7 +135,8 @@ def compute_optimal_energy_roiwise_slurm(values, state1, state2, A_norm, T, B, r
         energy = np.repeat(np.nan, nrois)
         return energy
     else:
-        x, u, n_err = optimal_input(A_norm, T, B, initial, goal, rho, S)
+        x, u, n_err = get_control_inputs(A_norm, T, B, initial, goal, rho=rho, S=S,
+                                         system='continuous')
         energy = integrate_u(u)
         return energy.astype(int)
 
