@@ -78,7 +78,7 @@ def compute_optimal_energy_roiwise(df,state1,state2,A_norm,T,B,rho,S):
         x, u, n_err = get_control_inputs(A_norm, T, B, initial, goal, rho=rho, S=S,
                                          system='continuous')
         energy = integrate_u(u)
-        n_err = np.repeat(n_err,nrois)
+        n_err = np.repeat(n_err[1],nrois)
     return energy, n_err
 
 def compute_optimal_energy_roiwise_array(state1,state2,A_norm,T,B,rho,S):
@@ -94,7 +94,7 @@ def compute_optimal_energy_roiwise_array(state1,state2,A_norm,T,B,rho,S):
     x, u, n_err = get_control_inputs(A_norm, T, B, state1, state2, rho=rho, S=S,
                                      system='continuous')
     energy = integrate_u(u)
-    n_err = np.repeat(n_err,nrois)
+    n_err = np.repeat(n_err[1],nrois)
     return energy, n_err
 
 def compute_optimal_energy_roiwise_null(df,state1,state2,A_norm,T,B,rho,S):
