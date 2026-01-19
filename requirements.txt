@@ -54,7 +54,7 @@ nbclassic
 nbclient
 nbconvert 
 nbformat 
-nctpy==1.0.0.post0
+nctpy==1.0.1
 nest-asyncio
 network-control==0.0.5
 neuromaps==0.0.3
