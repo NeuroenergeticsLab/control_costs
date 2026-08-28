@@ -660,3 +660,189 @@ def pcorr_significance(src, trg, covariates, nulls):
     p = (1 + sum(np.abs(permuted_results) > np.abs(r_true))) / (1 + n_perm)
     
     return r_true, p
+
+
+def compute_subject_average_control_energy(A, X, roi_network_id, activity_thr=0.5, B=None, S=None, 
+                                           rho=1, T=3, normalize_A=True, return_details=False):
+    """
+    Compute subject-level ROI-wise average (time-averaged) control energy from:
+      - A: (N, N) structural connectivity matrix
+      - X: (Tpts, N) ROI time series (activity per TR)
+      - roi_network_id: (N,) integer network membership in {1..K-1}
+        (K is reserved for NOTA = "None of the Above")
+
+    Pipeline (in-memory, no CSV/pandas):
+      1) TR labeling by dominant network if max network mean >= activity_thr else NOTA
+      2) State maps: mean ROI activation pattern per state
+      3) ROI-wise optimal control energy for all ordered state pairs
+      4) Time-average energies along empirical state sequence, skipping NOTA as current state
+
+    Parameters mirror the scripts:
+      activity_thr (default 0.5), B=I, S=I, rho=1, T=3
+
+    Returns
+    -------
+    ace : (N,) ndarray
+        ROI-wise average control energy across observed (previous -> current) transitions
+        where current != NOTA. If no valid transitions, returns all-nan.
+    details : dict (optional)
+        Includes tr_labels, state_maps, energies, counts, etc.
+    """
+    # ----------------------------
+    # Basic checks / setup
+    # ----------------------------
+    A = np.asarray(A, dtype=float)
+    X = np.asarray(X, dtype=float)
+    roi_network_id = np.asarray(roi_network_id, dtype=int)
+
+    if A.ndim != 2 or A.shape[0] != A.shape[1]:
+        raise ValueError("A must be a square (N, N) matrix.")
+    N = A.shape[0]
+    if X.ndim != 2 or X.shape[1] != N:
+        raise ValueError("X must have shape (Tpts, N) with N matching A.")
+    if roi_network_id.shape != (N,):
+        raise ValueError("roi_network_id must have shape (N,) matching A.")
+
+    # Define number of network states (excluding NOTA) and NOTA id
+    K_minus_1 = int(roi_network_id.max())  # networks are 1..K-1
+    K = K_minus_1 + 1                      # K is NOTA
+    NOTA_ID = K
+
+    # Default B, S match scripts: identity (full control, unit state weighting)
+    if B is None:
+        B = np.eye(N)
+    if S is None:
+        S = np.eye(N)
+    B = np.asarray(B, dtype=float)
+    S = np.asarray(S, dtype=float)
+
+    # ----------------------------
+    # Normalize A (same idea as matrix_normalization(..., system='continuous'))
+    # ----------------------------
+    A_norm = A
+    if normalize_A:
+        try:
+            from nctpy.utils import matrix_normalization
+            A_norm = matrix_normalization(A, c=1, system="continuous")
+        except Exception as e:
+            raise ImportError(
+                "Could not import/use nctpy.utils.matrix_normalization. "
+                "Install nctpy or set normalize_A=False and provide a pre-normalized A."
+                ) from e
+
+    # ----------------------------
+    # 1) Label each TR by dominant network or NOTA
+    #    (vectorized equivalent of tr_net_labels over TRs)
+    # ----------------------------
+    # Precompute ROI indices per network id (1..K-1)
+    net_roi_idx = [np.where(roi_network_id == net_id)[0] for net_id in range(1, K)]
+    # Compute mean activity per TR per network: shape (Tpts, K-1)
+    # If a network has 0 ROIs (shouldn't happen), mean becomes nan -> handle
+    Tpts = X.shape[0]
+    net_means = np.empty((Tpts, K_minus_1), dtype=float)
+    for j, idx in enumerate(net_roi_idx):
+        if idx.size == 0:
+            net_means[:, j] = np.nan
+        else:
+            net_means[:, j] = X[:, idx].mean(axis=1)
+
+    # Dominant network index (0..K-2); map to ids (1..K-1)
+    dom_idx = np.nanargmax(net_means, axis=1)
+    dom_val = net_means[np.arange(Tpts), dom_idx]
+    tr_labels = dom_idx + 1
+    # Apply threshold: below threshold -> NOTA
+    tr_labels = np.where(dom_val >= activity_thr, tr_labels, NOTA_ID).astype(int)
+
+    # ----------------------------
+    # 2) State maps: mean ROI pattern for each state id 1..K (K=NOTA)
+    # ----------------------------
+    state_maps = np.zeros((K, N), dtype=float)  # rows: 0..K-1 correspond to ids 1..K
+    state_counts = np.zeros(K, dtype=int)
+
+    for state_id in range(1, K + 1):
+        mask = (tr_labels == state_id)
+        cnt = int(mask.sum())
+        state_counts[state_id - 1] = cnt
+        if cnt > 0:
+            state_maps[state_id - 1, :] = X[mask, :].mean(axis=0)
+        else:
+            # mirrors their behavior of producing NaNs via downstream checks;
+            # here we keep zeros but record count=0 and handle later.
+            state_maps[state_id - 1, :] = 0.0
+
+    # ----------------------------
+    # 3) ROI-wise optimal transition energies for all ordered state pairs
+    # ----------------------------
+    try:
+        from nctpy.energies import get_control_inputs, integrate_u
+    except Exception as e:
+        raise ImportError(
+            "Could not import nctpy.energies.get_control_inputs/integrate_u. "
+            "Install nctpy to compute control energies."
+        ) from e
+
+    # energies[i, j, :] corresponds to transition (state_id=i+1) -> (state_id=j+1)
+    energies = np.full((K, K, N), np.nan, dtype=float)
+    # (optional) store the solver error flag the same way their utils repeats it
+    errors = np.full((K, K), np.nan, dtype=float)
+
+    for i in range(K):
+        x0 = state_maps[i, :][:, None]  # (N, 1)
+        for j in range(K):
+            xf = state_maps[j, :][:, None]  # (N, 1)
+
+            # If either state had no TRs, mimic their "empty -> NaN" behavior :contentReference[oaicite:4]{index=4}
+            if state_counts[i] == 0 or state_counts[j] == 0:
+                continue
+
+            x, u, n_err = get_control_inputs(
+                A_norm, T, B, x0, xf, rho=rho, S=S, system="continuous"
+            )
+            energies[i, j, :] = integrate_u(u)  # ROI-wise energy vector
+            # n_err is returned by nctpy; authors store n_err[1] repeated across ROIs :contentReference[oaicite:5]{index=5}
+            try:
+                errors[i, j] = float(n_err[1])
+            except Exception:
+                # fall back if shape differs
+                errors[i, j] = np.nan
+
+    # ----------------------------
+    # 4) Time-average along empirical state sequence (skip if current == NOTA)
+    # ----------------------------
+    energy_sum = np.zeros(N, dtype=float)
+    n_transitions = 0
+
+    for t in range(1, Tpts):
+        prev_id = int(tr_labels[t - 1])
+        curr_id = int(tr_labels[t])
+
+        # Match A2: skip first TR and skip transitions where current is NOTA :contentReference[oaicite:6]{index=6}
+        if curr_id == NOTA_ID:
+            continue
+
+        e_vec = energies[prev_id - 1, curr_id - 1, :]
+        # If missing (nan) because a state had 0 samples, skip
+        if np.any(np.isnan(e_vec)):
+            continue
+
+        energy_sum += e_vec
+        n_transitions += 1
+
+    if n_transitions == 0:
+        ace = np.full(N, np.nan, dtype=float)
+    else:
+        ace = energy_sum / n_transitions
+
+    if not return_details:
+        return ace
+
+    details = dict(
+        tr_labels=tr_labels,                 # (Tpts,) ints in {1..K}
+        state_maps=state_maps,               # (K, N)
+        state_counts=state_counts,           # (K,)
+        energies=energies,                   # (K, K, N)
+        errors=errors,                       # (K, K)
+        n_transitions=n_transitions,
+        A_norm=A_norm,
+        NOTA_ID=NOTA_ID)
+    return ace, details
